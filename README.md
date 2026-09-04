@@ -1,12 +1,21 @@
-# We Counted Our Own Agent Bill Wrong by 3×
+<p align="right"><a href="article.zh.md">中文</a> · <a href="https://qianjinguo.github.io/agent-memory-tax/zh.html">交互页（中文）</a></p>
 
-> **Agents don't pay to think. They pay to remember.**
+<p align="center"><img src="docs/img/agent-bill-banner.png" alt="Agents don't pay to think. They pay to remember."></p>
 
-![cost forensics](docs/img/agent-bill-hero.png)
+<p align="center">
+  <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/license-MIT-34d399"></a>
+  <img alt="reconciled with ccusage — token-exact" src="https://img.shields.io/badge/reconciled%20with%20ccusage-token%E2%80%91exact-22d3ee">
+  <img alt="self-test: 30s, python3, no install" src="https://img.shields.io/badge/self--test-30s%20·%20python3%20·%20no%20install-6366f1">
+</p>
+
+## We counted our own agent bill wrong by 3×
 
 Forensics on one real Claude Code session — 7 minutes, one code-review task, 257 lines of local logs:
 
-**Counting by log entries inflates input 3.3× and decisions 3×, while 89% of input traffic — cache re-reads — is completely invisible.**
+- **Naive log counting inflates input 3.3× and API calls 3×** — 33 log entries are really 11 calls
+- **89.3% of input traffic is cache re-reads** — riding the ~1/10-price invisible lane
+- **Cold start ≈ 30% of the bill** — the first call paid full price for 66,609 tokens
+- **One Bash result ≈ 16%** — a single 27,189-token output, the classic hidden fat order
 
 First, the elephant in the room: **the provider's bill is correct.** We reconciled against [ccusage](https://github.com/ryoppippi/ccusage) and it matches our deduplicated numbers to the token. What was wrong is hand-counting from logs. And that exposes the actual question:
 
@@ -18,6 +27,8 @@ First, the elephant in the room: **the provider's bill is correct.** We reconcil
 |---|---|---|---|
 | By log entries (naive) | 33 | 339,088 | 16,245 |
 | Dedup by `message.id` (real) | **11** | **103,616** | **6,734** |
+
+![naive ⇄ honest](docs/img/agent-bill-toggle.gif)
 
 ## Where the money actually goes
 
@@ -69,6 +80,9 @@ print(f"API calls: {len(calls)} | fresh: {fresh:,} | cache: {cache:,} ({cache/(f
 
 [article.zh.md](article.zh.md) (Chinese) — methodology and error bounds, the reconciliation experiment, and the multi-tool support matrix:
 
+<details>
+<summary><b>Multi-tool support matrix (verified first-hand on this machine)</b></summary>
+
 | Tool | Status |
 |---|---|
 | Claude Code | ✅ verified — usage four-piece + `message.id`, this post's calibration target |
@@ -76,6 +90,8 @@ print(f"API calls: {len(calls)} | fresh: {fresh:,} | cache: {cache:,} ({cache/(f
 | Codex CLI | ✅ verified — fresh / cache-read / cache-write split, reasoning tokens listed, plus 5h & weekly quota percent |
 | OpenCode / pi agent / Hermes | ⚠ verified gaps — export required or no usage fields (volume estimation only) |
 | Pure-cloud tools (e.g. DeepSeek web) | ✕ no local logs — hard boundary of the zero-integration method |
+
+</details>
 
 ## Limitations (the honest section)
 
