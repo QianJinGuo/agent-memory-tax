@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>账单透视 — Agent 不为思考付钱，为记忆付钱</title>
+<meta property="og:title" content="Agent 不为思考付钱，为记忆付钱">
+<meta property="og:description" content="一次真实 session 的成本透视：可见的「生成」只占账单 15%，其余 85% 是记忆操作。89.3% 的输入流量是缓存重读。口径全公开，30 秒可复现。">
+<style>
+  :root {
+    --bg: #08080f;
+    --surface: #11111c;
+    --surface-2: #191927;
+    --border: #262638;
+    --line: #1f1f2e;
+    --text: #eceef4;
+    --muted: #8f8fa8;
+    --dim: #5e5e78;
+    --accent: #6366f1;
+    --accent-2: #818cf8;
+    --cyan: #22d3ee;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --mono: "SF Mono", "Cascadia Code", ui-monospace, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Inter", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--sans);
+    line-height: 1.55; min-height: 100vh; padding: 34px 20px 60px;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(640px 320px at 12% -4%, rgba(99,102,241,.13), transparent 70%),
+      radial-gradient(520px 280px at 88% 4%, rgba(34,211,238,.07), transparent 70%);
+  }
+  .shell { width: min(1080px, 100%); margin: 0 auto; position: relative; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; font-size: 16px; letter-spacing: -.02em; }
+  .mark { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--cyan)); color: white; font: 800 13px var(--mono); }
+  .build-label { color: var(--dim); font: 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+
+  .hero { padding: 62px 0 30px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 9px; color: var(--cyan);
+    font: 11px var(--mono); letter-spacing: .13em; text-transform: uppercase; }
+  .eyebrow::before { content: ""; width: 24px; height: 2px; background: var(--accent); }
+  h1 { margin: 16px 0 14px; font-size: clamp(40px, 6vw, 74px); line-height: .96; letter-spacing: -.06em; font-weight: 750; }
+  h1 em { font-style: normal; background: linear-gradient(100deg, var(--accent-2), var(--cyan));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .lede { max-width: 660px; color: var(--muted); font-size: 15.5px; line-height: 1.7; }
+  .lede b { color: var(--text); font-weight: 600; }
+
+  .clarify {
+    margin: 26px 0 0; padding: 15px 19px; border-radius: 12px;
+    border: 1px solid rgba(34,211,238,.35); background: rgba(34,211,238,.06);
+    color: var(--muted); font-size: 12.5px; line-height: 1.65;
+  }
+  .clarify b { color: var(--cyan); font-weight: 700; }
+  .clarify strong { color: var(--text); }
+
+  .section-label {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+    margin: 44px 0 16px;
+  }
+  .section-label h2 { font-size: 20px; letter-spacing: -.03em; }
+  .section-label span { color: var(--dim); font: 10.5px var(--mono); }
+
+  /* naive/honest toggle */
+  .ledger {
+    border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+    background: linear-gradient(160deg, rgba(25,25,39,.92), rgba(17,17,28,.92));
+    box-shadow: 0 22px 60px rgba(0,0,0,.45);
+  }
+  .toggle-row { display: flex; gap: 8px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+  .tg {
+    cursor: pointer; padding: 9px 14px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--muted); font: 12px var(--mono); transition: .18s ease;
+  }
+  .tg.on { background: rgba(99,102,241,.16); border-color: var(--accent); color: var(--text); font-weight: 700; }
+  .tg .tag { color: var(--dim); font-size: 10px; margin-left: 6px; }
+  .tg.on .tag { color: var(--accent-2); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .stat-cell { padding: 26px 22px 22px; border-right: 1px solid var(--line); }
+  .stat-cell:last-child { border-right: 0; }
+  .stat-num { font: 800 clamp(30px, 4.4vw, 46px)/1 var(--mono); letter-spacing: -.04em;
+    transition: color .3s ease; }
+  .stat-num.warn { color: var(--red); }
+  .stat-num.good { background: linear-gradient(110deg, var(--accent-2), var(--cyan));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .stat-name { margin-top: 9px; color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+  .stat-note { margin-top: 6px; color: var(--muted); font-size: 11.5px; line-height: 1.55; min-height: 34px; }
+  .ledger-foot { padding: 13px 22px; border-top: 1px solid var(--line); color: var(--dim); font: 10.5px var(--mono);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .ledger-foot b { color: var(--cyan); font-weight: 500; }
+
+  /* method */
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
+  .m-card { border: 1px solid var(--border); border-radius: 13px; padding: 17px;
+    background: linear-gradient(150deg, rgba(24,24,38,.85), rgba(16,16,27,.85)); }
+  .m-no { color: var(--cyan); font: 11px var(--mono); letter-spacing: .1em; }
+  .m-card h3 { margin: 9px 0 7px; font-size: 14.5px; letter-spacing: -.02em; }
+  .m-card p { color: var(--muted); font-size: 12px; line-height: 1.6; }
+  .m-card code { font: 11px var(--mono); color: var(--cyan); }
+
+  .defense { display: flex; gap: 10px; margin-top: 13px; flex-wrap: wrap; }
+  .d-chip { flex: 1 1 220px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); }
+  .d-chip b { display: block; font: 600 12px var(--mono); color: var(--green); margin-bottom: 5px; }
+  .d-chip span { color: var(--muted); font-size: 11.5px; line-height: 1.55; display: block; }
+
+  /* claim / not-claim */
+  .claims { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+  .claim-col { border: 1px solid var(--border); border-radius: 13px; overflow: hidden; background: var(--surface); }
+  .claim-head { padding: 12px 16px; font: 700 12.5px var(--sans); letter-spacing: .02em; }
+  .claim-head.say { background: rgba(52,211,153,.12); color: var(--green); }
+  .claim-head.mute { background: rgba(248,113,113,.10); color: var(--red); }
+  .claim-col ul { list-style: none; padding: 8px 16px 14px; }
+  .claim-col li { padding: 8px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12.5px; line-height: 1.5; display: flex; gap: 9px; }
+  .claim-col li:last-child { border-bottom: 0; }
+  .claim-col li b { color: var(--text); font-weight: 600; }
+  .ic-say, .ic-mute { flex: 0 0 auto; font-weight: 800; }
+  .ic-say { color: var(--green); }
+  .ic-mute { color: var(--red); }
+
+  /* value cards */
+  .value-band {
+    margin-top: 44px; padding: 30px 30px 26px; border-radius: 16px;
+    background: linear-gradient(130deg, #141425 0%, #0e1420 100%); border: 1px solid var(--border);
+  }
+  .value-band > .section-label { margin: 0 0 6px; }
+  .v-line { font-size: clamp(20px, 3vw, 30px); letter-spacing: -.04em; line-height: 1.15; margin: 6px 0 20px; }
+  .v-line em { font-style: normal; color: var(--cyan); }
+  .v-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
+  .v-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: rgba(10,10,20,.6); }
+  .v-card .who { color: var(--cyan); font: 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+  .v-card h3 { margin: 9px 0 7px; font-size: 15px; letter-spacing: -.02em; }
+  .v-card p { color: var(--muted); font-size: 12px; line-height: 1.62; }
+  .v-card p b { color: var(--text); font-weight: 600; }
+
+  .script-box { margin-top: 26px; border: 1px solid var(--border); border-radius: 12px; background: #0a0a15; overflow: hidden; }
+  .script-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid var(--line);
+    color: var(--dim); font: 10.5px var(--mono); }
+  .copy-btn { cursor: pointer; border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+    border-radius: 7px; padding: 5px 11px; font: 11px var(--mono); transition: .18s; }
+  .copy-btn:hover { border-color: var(--accent); }
+  pre { margin: 0; padding: 15px 17px; overflow-x: auto; font: 12px/1.7 var(--mono); color: #c8cade; }
+  pre .cm { color: var(--dim); }
+  pre .kw { color: var(--accent-2); }
+  pre .st { color: var(--green); }
+
+  /* tiers */
+  .tiers { border: 1px solid var(--border); border-radius: 13px; overflow: hidden; background: var(--surface); }
+  .tier-row { display: grid; grid-template-columns: 150px 1fr 90px; gap: 12px; padding: 12px 17px; border-bottom: 1px solid var(--line); align-items: baseline; }
+  .tier-row:last-child { border-bottom: 0; }
+  .tier-name { font: 600 12.5px var(--sans); }
+  .tier-name small { display: block; color: var(--dim); font: 10px var(--mono); margin-top: 2px; }
+  .tier-desc { color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+  .tier-badge { text-align: right; font: 600 11px var(--mono); }
+  .b-ok { color: var(--green); } .b-warn { color: var(--amber); } .b-no { color: var(--red); }
+
+  /* final band */
+  .final {
+    margin-top: 44px; padding: 34px 32px; border-radius: 16px;
+    background: linear-gradient(130deg, #12122a 0%, #0c1522 100%); border: 1px solid var(--border);
+    text-align: center;
+  }
+  .final h2 { font-size: clamp(22px, 3.4vw, 36px); letter-spacing: -.05em; line-height: 1.1; }
+  .final h2 em { font-style: normal; background: linear-gradient(100deg, var(--accent-2), var(--cyan));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .final p { margin: 14px auto 0; max-width: 620px; color: var(--muted); font-size: 13.5px; line-height: 1.7; }
+  .final .meta { margin-top: 18px; display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; color: var(--dim); font: 10px var(--mono); }
+  .final .meta b { color: var(--cyan); font-weight: 500; }
+
+  .foot { margin-top: 20px; text-align: center; color: var(--dim); font: 10.5px var(--mono); line-height: 1.8; }
+
+  .toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 14px); opacity: 0;
+    pointer-events: none; transition: .25s ease; background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 15px; border-radius: 9px; font-size: 12px; }
+
+  @media (max-width: 860px) {
+    .grid3, .v-grid { grid-template-columns: 1fr; }
+    .claims { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr; }
+    .stat-cell { border-right: 0; border-bottom: 1px solid var(--line); }
+    .tier-row { grid-template-columns: 1fr; }
+    .tier-badge { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand"><div class="mark">透视</div><div>Agent 账单透视</div></div>
+    <div class="build-label">interactive data post · 口径全公开</div>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow">Session economics · every assumption on the table</div>
+    <h1>Agent 不为思考付钱，<br><em>为记忆付钱。</em></h1>
+    <p class="lede">一次真实 session 的成本透视：可见的「生成」只占账单 15%。其余 85% 花在同一件事上——<b>把历史反复读进上下文</b>。89.3% 的输入流量是缓存重读，30% 的账单是第一秒的冷启动，一条命令吃掉 16%。口径、方法、误差边界全部公开，30 秒可复现。</p>
+  </section>
+
+  <div class="clarify"><strong>边界一句话：</strong>官方账单没有错；ccusage 的计量经对账逐 token 正确。本页负责的是计量之后的部分——<b>日志里看得见、报表不会算给你的成本结构</b>。自测脚本在下方，欢迎逐 token 复核。</div>
+
+  <div class="section-label">
+    <h2>同一份日志，两种记账</h2>
+    <span>session d823d9e5 · 257 行 · 私有仓库 · 7 min</span>
+  </div>
+  <section class="ledger">
+    <div class="toggle-row">
+      <button class="tg on" id="tgNaive">按条数记账<span class="tag">naive</span></button>
+      <button class="tg" id="tgHonest">按口径去重<span class="tag">honest</span></button>
+    </div>
+    <div class="stats">
+      <div class="stat-cell">
+        <div class="stat-num warn" id="nCalls">33</div>
+        <div class="stat-name">API 调用次数</div>
+        <div class="stat-note" id="noteCalls">把每条日志记录当成一次调用——流式响应被记 2–4 条，全算了一遍。</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num warn" id="nInput">339,088</div>
+        <div class="stat-name">输入 tokens</div>
+        <div class="stat-note" id="noteInput">重复记录直接加总——同一份 usage 被数了 3.3 次。</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num warn" id="nOut">16,245</div>
+        <div class="stat-name">输出 tokens</div>
+        <div class="stat-note" id="noteOut">同样被重复计数，虚高 2.4 倍。</div>
+      </div>
+    </div>
+    <div class="ledger-foot">
+      <span id="ledgerVerdict">⚠️ 这个口径把 3 倍的噪声当成了事实</span>
+      <span>source: <b>~/.claude/projects/&lt;私有仓库&gt;/d823d9e5….jsonl</b></span>
+    </div>
+  </section>
+
+  <div class="section-label">
+    <h2>三步法：每个 Agent 工具都适用</h2>
+    <span>通用的是方法，不是数字</span>
+  </div>
+  <section class="grid3">
+    <div class="m-card"><div class="m-no">STEP 1</div><h3>定位本地日志</h3><p>各家 runtime 都把 session 落在可预测的本地路径：<code>~/.claude/projects/</code>、<code>~/.codex/sessions/</code>、<code>~/.zcode/cli/rollout/</code>……零接入，不碰你的代码。</p></div>
+    <div class="m-card"><div class="m-no">STEP 2</div><h3>按 call id 去重</h3><p>流式响应被拆成多条记录，每条带着同一份 usage。按 <code>message.id</code> 去重后，33 条记录还原成 11 次真实 API 调用。</p></div>
+    <div class="m-card"><div class="m-no">STEP 3</div><h3>拆成三个桶</h3><p><code>fresh input</code>（全价）/ <code>cache_read</code>（约 1/10 价）/ <code>output</code>——三桶分开，钱去哪了才第一次可见。混在一起的总数没有意义。</p></div>
+  </section>
+  <div class="defense">
+    <div class="d-chip"><b>L1 · 自洽校验</b><span>同 id 重复记录 usage 0 个不一致；上下文守恒校验暴露每调用 ±几百 token 的切分模糊——所以结论只下在量级上。</span></div>
+    <div class="d-chip"><b>L2 · 账单对账</b><span>金标准是供应商账单，不是任何日志工具。本次无账单可对，已在文中如实声明。</span></div>
+    <div class="d-chip"><b>L3 · 版本锚定</b><span>口径绑定 Claude Code v2.1.153 验证；runtime 升级即漂移，口径随版本重验。</span></div>
+  </div>
+
+  <div class="section-label">
+    <h2>敢说的，和不说的</h2>
+    <span>结论只下在噪声之上</span>
+  </div>
+  <section class="claims">
+    <div class="claim-col">
+      <div class="claim-head say">✓ 敢说（远超噪声量级）</div>
+      <ul>
+        <li><span class="ic-say">✓</span><span><b>33 条记录 ≠ 11 次调用</b>——重复记账让调用数虚高 3 倍</span></li>
+        <li><span class="ic-say">✓</span><span><b>输入流量的 89.3% 是缓存命中</b>——866,560 tokens 走的是约 1/10 价的隐形通道</span></li>
+        <li><span class="ic-say">✓</span><span><b>冷启动 ≈ 全账单 30%</b>——第一次调用为 66,609 tokens 付了全价</span></li>
+        <li><span class="ic-say">✓</span><span><b>单条 Bash 结果 ≈ 16%</b>——一次 27,189 token 的大输出，就是隐形大单</span></li>
+      </ul>
+    </div>
+    <div class="claim-col">
+      <div class="claim-head mute">✕ 不说（边界之内）</div>
+      <ul>
+        <li><span class="ic-mute">✕</span><span><b>单次调用的精确归因</b>——缓存断点由系统决定，每处 ±几百 token 模糊</span></li>
+        <li><span class="ic-mute">✕</span><span><b>行业分布</b>——n=1，只声称这个 session 的结构</span></li>
+        <li><span class="ic-mute">✕</span><span><b>美元金额</b>——日志里没有钱；比价是假设，定价表按模型走</span></li>
+        <li><span class="ic-mute">✕</span><span><b>未校准 runtime 的数字</b>——口径只在 Claude Code v2.1.153 上验证</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="value-band">
+    <div class="section-label"><h2>为什么这份透视可信</h2><span>不是被依赖，而是可核查</span></div>
+    <p class="v-line">可信不是姿态，是<em>可复核的检验路径</em>。</p>
+    <div class="v-grid">
+      <div class="v-card"><div class="who">给读者</div><h3>核查权在你手里</h3><p>下面 30 秒脚本跑在你自己的日志上。<b>不用信我们——自己算，然后去质问你现有的成本工具。</b></p></div>
+      <div class="v-card"><div class="who">给工具作者</div><h3>一份可执行的清单</h3><p>id 去重、缓存拆分、版本锚定——三条全部可测试。<b>照着做，你的工具就经得起评论区较真。</b></p></div>
+      <div class="v-card"><div class="who">给数字本身</div><h3>诚实作为方法</h3><p>每个结论都标注噪声边界；<b>说不出的结论就明说不出。</b>在满是"trust me"的赛道里，这本身是稀缺品。</p></div>
+    </div>
+    <div class="script-box">
+      <div class="script-head"><span>30 秒自测 · 跑在你自己的 ~/.claude/projects 上</span><button class="copy-btn" id="copyBtn">复制</button></div>
+      <pre id="scriptBody"><span class="cm"># 你的账单被算错了吗？跑一下就知道</span>
+<span class="kw">import</span> json, glob
+calls = {}
+<span class="kw">for</span> fp <span class="kw">in</span> glob.glob(<span class="st">'~/.claude/projects/*/*.jsonl'</span>):
+    <span class="kw">for</span> line <span class="kw">in</span> open(fp):
+        r = json.loads(line)
+        <span class="kw">if</span> r.get(<span class="st">'type'</span>) != <span class="st">'assistant'</span>: <span class="kw">continue</span>
+        calls[r[<span class="st">'message'</span>][<span class="st">'id'</span>]] = r[<span class="st">'message'</span>][<span class="st">'usage'</span>]  <span class="cm"># message.id 去重</span>
+fresh = sum(u[<span class="st">'input_tokens'</span>] <span class="kw">for</span> u <span class="kw">in</span> calls.values())
+cache = sum(u[<span class="st">'cache_read_input_tokens'</span>] <span class="kw">for</span> u <span class="kw">in</span> calls.values())
+out   = sum(u[<span class="st">'output_tokens'</span>] <span class="kw">for</span> u <span class="kw">in</span> calls.values())
+<span class="kw">print</span>(<span class="st">f"API 调用: </span>{len(calls)}<span class="st"> | fresh: </span>{fresh:,}<span class="st"> | cache: </span>{cache:,}<span class="st"> (</span>{cache/(fresh+cache):.0%}<span class="st">) | out: </span>{out:,}<span class="st">"</span>)</pre>
+    </div>
+  </section>
+
+  <div class="section-label">
+    <h2>多工具适用性</h2>
+    <span>本地有日志就能检，纯云工具是物理边界</span>
+  </div>
+  <section class="tiers">
+    <div class="tier-row"><div class="tier-name">Claude Code<small>~/.claude/projects/</small></div><div class="tier-desc">usage 四件套 + message.id，本文口径已在此验证。</div><div class="tier-badge b-ok">✓ 已验证</div></div>
+    <div class="tier-row"><div class="tier-name">ZCode<small>~/.zcode/cli/rollout/</small></div><div class="tier-desc">每次调用完整请求体 + 精确 usage，CJK 估算误差 0.97–1.02。</div><div class="tier-badge b-ok">✓ 已验证</div></div>
+    <div class="tier-row"><div class="tier-name">Codex CLI<small>~/.codex/sessions/</small></div><div class="tier-desc">已验证：fresh / cache-read / cache-write 三桶分列，reasoning 输出单列，还附 5 小时/每周配额百分比——字段比 Claude Code 更全。</div><div class="tier-badge b-ok">✓ 已验证</div></div>
+    <div class="tier-row"><div class="tier-name">OpenCode / pi agent / Hermes</div><div class="tier-desc">已核实：OpenCode 本地存储不暴露 usage（需 export）；Hermes 会话为纯对话、无 usage 字段（只能体积估算）；pi 未测。</div><div class="tier-badge b-warn">⚠ 降级支持</div></div>
+    <div class="tier-row"><div class="tier-name">DeepSeek 网页版等纯云工具</div><div class="tier-desc">没有本地日志——零接入方法的物理边界，只能等服务方导出。</div><div class="tier-badge b-no">✕ 边界外</div></div>
+  </section>
+
+  <section class="final">
+    <h2>Agent 每回答一句，<em>都先把历史重读一遍。</em></h2>
+    <p>把脚本跑在你自己的日志上，看看你的账单里记忆和思考的比例。如果你的报表从没告诉过你缓存占比、冷启动和大单——现在你知道差距在哪了，也知道该向工具要求什么。</p>
+    <div class="meta">
+      <span>session <b>d823d9e5</b></span><span>·</span>
+      <span><b>257</b> 行日志</span><span>·</span>
+      <span>Claude Code <b>v2.1.153</b></span><span>·</span>
+      <span>对账：<b>ccusage 逐 token 一致</b></span><span>·</span>
+      <span><b>单文件 HTML</b> · 无外部依赖</span>
+    </div>
+  </section>
+
+  <div class="foot">
+    数据：真实 session d823d9e5（glm-5-3-flash 经代理，cache_creation 恒 0 疑似代理丢失字段）· 比价为典型假设 · n=1<br>
+    <b>账单透视</b> — interactive companion to《我们把自己的 Agent 账单算错了 3 倍》
+  </div>
+</div>
+
+<div class="toast" id="toast">脚本已复制 — 去跑你自己的日志</div>
+
+<script>
+// naive ⇄ honest 切换
+const STATES = {
+  naive: {
+    calls: "33", input: "339,088", out: "16,245",
+    notes: ["把每条日志记录当成一次调用——流式响应被记 2–4 条，全算了一遍。",
+            "重复记录直接加总——同一份 usage 被数了 3.3 次。",
+            "同样被重复计数，虚高 2.4 倍。"],
+    verdict: "⚠️ 这个口径把 3 倍的噪声当成了事实", cls: "warn"
+  },
+  honest: {
+    calls: "11", input: "103,616", out: "6,734",
+    notes: ["按 message.id 去重后的真实计费次数。",
+            "fresh input 全价部分；另有 866,560 cache_read 走约 1/10 价。",
+            "去重后的真实输出——最后一次长回复占 31%。"],
+    verdict: "✓ 口径：message.id 去重 + 缓存三桶拆分 · 已与 ccusage 逐 token 对账一致", cls: "good"
+  }
+};
+function setMode(mode) {
+  const s = STATES[mode];
+  document.getElementById("nCalls").textContent = s.calls;
+  document.getElementById("nInput").textContent = s.input;
+  document.getElementById("nOut").textContent = s.out;
+  document.getElementById("noteCalls").textContent = s.notes[0];
+  document.getElementById("noteInput").textContent = s.notes[1];
+  document.getElementById("noteOut").textContent = s.notes[2];
+  document.getElementById("ledgerVerdict").textContent = s.verdict;
+  ["nCalls", "nInput", "nOut"].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove("warn", "good");
+    el.classList.add(mode === "naive" ? "warn" : "good");
+  });
+  document.getElementById("tgNaive").classList.toggle("on", mode === "naive");
+  document.getElementById("tgHonest").classList.toggle("on", mode === "honest");
+}
+document.getElementById("tgNaive").addEventListener("click", () => setMode("naive"));
+document.getElementById("tgHonest").addEventListener("click", () => setMode("honest"));
+
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(document.getElementById("scriptBody").innerText);
+    showToast("脚本已复制 — 去跑你自己的日志");
+  } catch (_) { showToast("复制失败 — 请手动选择"); }
+});
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.opacity = "1"; t.style.transform = "translate(-50%,0)";
+  setTimeout(() => { t.style.opacity = "0"; t.style.transform = "translate(-50%,14px)"; }, 2200);
+}
+
+// 深链支持：?mode=honest 直接以诚实口径+Step 4 打开（供截图与分享）
+if (new URLSearchParams(location.search).get("mode") === "honest") {
+  setMode("honest");
+  document.querySelectorAll("#steps .step").forEach((s, i) => { s.classList.toggle("active", i === 3); s.classList.toggle("done", i <= 3); });
+  const cap = document.getElementById("stepCaption");
+  if (cap) cap.textContent = "Step 4 of 4 · single-file card, ready to share";
+}
+</script>
+</body>
+</html>
