@@ -73,8 +73,6 @@ print(f"API calls: {len(calls)} | fresh: {fresh:,} | cache: {cache:,} ({cache/(f
 
 n=1. Pricing ratios are assumptions — logs contain tokens, not dollars. The GLM endpoint was proxied and `cache_creation` was always 0 (likely dropped by the proxy). The methodology is pinned to Claude Code v2.1.153; runtimes drift, so re-validate on upgrade.
 
-中文完整版：[article.zh.md](article.zh.md)
-
 ## License
 
 MIT
