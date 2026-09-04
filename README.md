@@ -51,7 +51,7 @@ print(f"API calls: {len(calls)} | fresh: {fresh:,} | cache: {cache:,} ({cache/(f
 
 ## Interactive page
 
-**[Live interactive version](https://qianjinguo.github.io/agent-memory-tax/)** — one click toggles between the naive and honest ledger, plus the full "what we claim / what we don't" list. `?mode=honest` deep-links the honest ledger.
+**[Live interactive version](https://qianjinguo.github.io/agent-memory-tax/)** (English; [中文版](https://qianjinguo.github.io/agent-memory-tax/zh.html)) — one click toggles between the naive and honest ledger, plus the full "what we claim / what we don't" list. `?mode=honest` deep-links the honest ledger.
 
 | Naive ledger | Honest ledger |
 |---|---|

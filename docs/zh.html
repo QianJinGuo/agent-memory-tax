@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Bill Forensics — Agents don't pay to think. They pay to remember.</title>
-<meta property="og:title" content="Agents don't pay to think. They pay to remember.">
-<meta property="og:description" content="A cost forensic of one real agent session: the visible 'generation' is only 15% of the bill. 89.3% of input traffic is cache re-reads. Full methodology, reproducible in 30 seconds.">
+<title>账单透视 — Agent 不为思考付钱，为记忆付钱</title>
+<meta property="og:title" content="Agent 不为思考付钱，为记忆付钱">
+<meta property="og:description" content="一次真实 session 的成本透视：可见的「生成」只占账单 15%，其余 85% 是记忆操作。89.3% 的输入流量是缓存重读。口径全公开，30 秒可复现。">
 <style>
   :root {
     --bg: #08080f;
@@ -41,7 +41,7 @@
   .topbar { display: flex; justify-content: space-between; align-items: center; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; font-size: 16px; letter-spacing: -.02em; }
   .mark { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
-    background: linear-gradient(135deg, var(--accent), var(--cyan)); color: white; font: 800 11px var(--mono); }
+    background: linear-gradient(135deg, var(--accent), var(--cyan)); color: white; font: 800 13px var(--mono); }
   .build-label { color: var(--dim); font: 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
 
   .hero { padding: 62px 0 30px; }
@@ -69,6 +69,7 @@
   .section-label h2 { font-size: 20px; letter-spacing: -.03em; }
   .section-label span { color: var(--dim); font: 10.5px var(--mono); }
 
+  /* naive/honest toggle */
   .ledger {
     border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
     background: linear-gradient(160deg, rgba(25,25,39,.92), rgba(17,17,28,.92));
@@ -96,6 +97,7 @@
     display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   .ledger-foot b { color: var(--cyan); font-weight: 500; }
 
+  /* method */
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
   .m-card { border: 1px solid var(--border); border-radius: 13px; padding: 17px;
     background: linear-gradient(150deg, rgba(24,24,38,.85), rgba(16,16,27,.85)); }
@@ -109,6 +111,7 @@
   .d-chip b { display: block; font: 600 12px var(--mono); color: var(--green); margin-bottom: 5px; }
   .d-chip span { color: var(--muted); font-size: 11.5px; line-height: 1.55; display: block; }
 
+  /* claim / not-claim */
   .claims { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
   .claim-col { border: 1px solid var(--border); border-radius: 13px; overflow: hidden; background: var(--surface); }
   .claim-head { padding: 12px 16px; font: 700 12.5px var(--sans); letter-spacing: .02em; }
@@ -122,6 +125,7 @@
   .ic-say { color: var(--green); }
   .ic-mute { color: var(--red); }
 
+  /* value cards */
   .value-band {
     margin-top: 44px; padding: 30px 30px 26px; border-radius: 16px;
     background: linear-gradient(130deg, #141425 0%, #0e1420 100%); border: 1px solid var(--border);
@@ -147,8 +151,9 @@
   pre .kw { color: var(--accent-2); }
   pre .st { color: var(--green); }
 
+  /* tiers */
   .tiers { border: 1px solid var(--border); border-radius: 13px; overflow: hidden; background: var(--surface); }
-  .tier-row { display: grid; grid-template-columns: 190px 1fr 110px; gap: 12px; padding: 12px 17px; border-bottom: 1px solid var(--line); align-items: baseline; }
+  .tier-row { display: grid; grid-template-columns: 150px 1fr 90px; gap: 12px; padding: 12px 17px; border-bottom: 1px solid var(--line); align-items: baseline; }
   .tier-row:last-child { border-bottom: 0; }
   .tier-name { font: 600 12.5px var(--sans); }
   .tier-name small { display: block; color: var(--dim); font: 10px var(--mono); margin-top: 2px; }
@@ -156,6 +161,7 @@
   .tier-badge { text-align: right; font: 600 11px var(--mono); }
   .b-ok { color: var(--green); } .b-warn { color: var(--amber); } .b-no { color: var(--red); }
 
+  /* final band */
   .final {
     margin-top: 44px; padding: 34px 32px; border-radius: 16px;
     background: linear-gradient(130deg, #12122a 0%, #0c1522 100%); border: 1px solid var(--border);
@@ -187,163 +193,163 @@
 <body>
 <div class="shell">
   <header class="topbar">
-    <div class="brand"><div class="mark">👁</div><div>Bill Forensics</div></div>
-    <div class="build-label"><a href="zh.html" style="color:var(--cyan);text-decoration:none">中文版</a> &nbsp;·&nbsp; interactive data post</div>
+    <div class="brand"><div class="mark">透视</div><div>Agent 账单透视</div></div>
+    <div class="build-label"><a href="index.html" style="color:var(--cyan);text-decoration:none">English</a> · interactive data post · 口径全公开</div>
   </header>
 
   <section class="hero">
     <div class="eyebrow">Session economics · every assumption on the table</div>
-    <h1>Agents don't pay to think.<br><em>They pay to remember.</em></h1>
-    <p class="lede">A cost forensic of one real agent session (7 minutes, one code-review task, 257 lines of local logs): the visible "generation" is only <b>15% of the bill</b>. The other 85% goes to the same thing — <b>reading history back into context, over and over</b>. 89.3% of input traffic is cache re-reads, 30% of the bill is the first second, a single command ate 16%. Full methodology and error bounds below; reproducible in 30 seconds.</p>
+    <h1>Agent 不为思考付钱，<br><em>为记忆付钱。</em></h1>
+    <p class="lede">一次真实 session 的成本透视：可见的「生成」只占账单 15%。其余 85% 花在同一件事上——<b>把历史反复读进上下文</b>。89.3% 的输入流量是缓存重读，30% 的账单是第一秒的冷启动，一条命令吃掉 16%。口径、方法、误差边界全部公开，30 秒可复现。</p>
   </section>
 
-  <div class="clarify"><strong>One boundary up front: the provider's bill is correct.</strong> ccusage's metering matched ours token-for-token. This page covers what comes after metering — <b>the cost structure visible in the logs that no report computes for you.</b> Self-test script below; token-level review welcome.</div>
+  <div class="clarify"><strong>边界一句话：</strong>官方账单没有错；ccusage 的计量经对账逐 token 正确。本页负责的是计量之后的部分——<b>日志里看得见、报表不会算给你的成本结构</b>。自测脚本在下方，欢迎逐 token 复核。</div>
 
   <div class="section-label">
-    <h2>Same log, two ledgers</h2>
-    <span>session d823d9e5 · 257 lines · private repo · 7 min</span>
+    <h2>同一份日志，两种记账</h2>
+    <span>session d823d9e5 · 257 行 · 私有仓库 · 7 min</span>
   </div>
   <section class="ledger">
     <div class="toggle-row">
-      <button class="tg on" id="tgNaive">Count by entries<span class="tag">naive</span></button>
-      <button class="tg" id="tgHonest">Dedup by call id<span class="tag">honest</span></button>
+      <button class="tg on" id="tgNaive">按条数记账<span class="tag">naive</span></button>
+      <button class="tg" id="tgHonest">按口径去重<span class="tag">honest</span></button>
     </div>
     <div class="stats">
       <div class="stat-cell">
         <div class="stat-num warn" id="nCalls">33</div>
-        <div class="stat-name">API calls</div>
-        <div class="stat-note" id="noteCalls">Counting every log record as one call — streaming responses are logged 2–4 times each, all counted.</div>
+        <div class="stat-name">API 调用次数</div>
+        <div class="stat-note" id="noteCalls">把每条日志记录当成一次调用——流式响应被记 2–4 条，全算了一遍。</div>
       </div>
       <div class="stat-cell">
         <div class="stat-num warn" id="nInput">339,088</div>
-        <div class="stat-name">input tokens</div>
-        <div class="stat-note" id="noteInput">Duplicate records summed directly — the same usage snapshot counted 3.3 times.</div>
+        <div class="stat-name">输入 tokens</div>
+        <div class="stat-note" id="noteInput">重复记录直接加总——同一份 usage 被数了 3.3 次。</div>
       </div>
       <div class="stat-cell">
         <div class="stat-num warn" id="nOut">16,245</div>
-        <div class="stat-name">output tokens</div>
-        <div class="stat-note" id="noteOut">Also double-counted — inflated 2.4×.</div>
+        <div class="stat-name">输出 tokens</div>
+        <div class="stat-note" id="noteOut">同样被重复计数，虚高 2.4 倍。</div>
       </div>
     </div>
     <div class="ledger-foot">
-      <span id="ledgerVerdict">⚠️ This ledger treats 3× noise as fact</span>
-      <span>source: <b>~/.claude/projects/&lt;private-repo&gt;/d823d9e5….jsonl</b></span>
+      <span id="ledgerVerdict">⚠️ 这个口径把 3 倍的噪声当成了事实</span>
+      <span>source: <b>~/.claude/projects/&lt;私有仓库&gt;/d823d9e5….jsonl</b></span>
     </div>
   </section>
 
   <div class="section-label">
-    <h2>The three-step method — works on every agent tool</h2>
-    <span>the method generalizes, not the numbers</span>
+    <h2>三步法：每个 Agent 工具都适用</h2>
+    <span>通用的是方法，不是数字</span>
   </div>
   <section class="grid3">
-    <div class="m-card"><div class="m-no">STEP 1</div><h3>Locate the local logs</h3><p>Every runtime drops sessions in predictable paths: <code>~/.claude/projects/</code>, <code>~/.codex/sessions/</code>, <code>~/.zcode/cli/rollout/</code>… Zero integration, zero code touched.</p></div>
-    <div class="m-card"><div class="m-no">STEP 2</div><h3>Dedup by call id</h3><p>Streaming responses are split into 2–4 records, each carrying the same usage snapshot. Dedup by <code>message.id</code> turns 33 records back into 11 real API calls.</p></div>
-    <div class="m-card"><div class="m-no">STEP 3</div><h3>Split into three buckets</h3><p><code>fresh input</code> (full price) / <code>cache_read</code> (~1/10 price) / <code>output</code>. Only when the buckets are separate is "where the money went" visible. A merged total is meaningless.</p></div>
+    <div class="m-card"><div class="m-no">STEP 1</div><h3>定位本地日志</h3><p>各家 runtime 都把 session 落在可预测的本地路径：<code>~/.claude/projects/</code>、<code>~/.codex/sessions/</code>、<code>~/.zcode/cli/rollout/</code>……零接入，不碰你的代码。</p></div>
+    <div class="m-card"><div class="m-no">STEP 2</div><h3>按 call id 去重</h3><p>流式响应被拆成多条记录，每条带着同一份 usage。按 <code>message.id</code> 去重后，33 条记录还原成 11 次真实 API 调用。</p></div>
+    <div class="m-card"><div class="m-no">STEP 3</div><h3>拆成三个桶</h3><p><code>fresh input</code>（全价）/ <code>cache_read</code>（约 1/10 价）/ <code>output</code>——三桶分开，钱去哪了才第一次可见。混在一起的总数没有意义。</p></div>
   </section>
   <div class="defense">
-    <div class="d-chip"><b>L1 · Internal consistency</b><span>Same-id duplicate records: 0 usage mismatches; context conservation exposed ±a few hundred tokens of split fuzz per call — so conclusions only at magnitude level.</span></div>
-    <div class="d-chip"><b>L2 · Bill reconciliation</b><span>The gold standard is the provider's bill, not any log tool. This run had none to reconcile; declared as such.</span></div>
-    <div class="d-chip"><b>L3 · Version pinning</b><span>Methodology verified on Claude Code v2.1.153. Runtimes drift — re-validate per version.</span></div>
+    <div class="d-chip"><b>L1 · 自洽校验</b><span>同 id 重复记录 usage 0 个不一致；上下文守恒校验暴露每调用 ±几百 token 的切分模糊——所以结论只下在量级上。</span></div>
+    <div class="d-chip"><b>L2 · 账单对账</b><span>金标准是供应商账单，不是任何日志工具。本次无账单可对，已在文中如实声明。</span></div>
+    <div class="d-chip"><b>L3 · 版本锚定</b><span>口径绑定 Claude Code v2.1.153 验证；runtime 升级即漂移，口径随版本重验。</span></div>
   </div>
 
   <div class="section-label">
-    <h2>What we claim, and what we don't</h2>
-    <span>conclusions only above the noise floor</span>
+    <h2>敢说的，和不说的</h2>
+    <span>结论只下在噪声之上</span>
   </div>
   <section class="claims">
     <div class="claim-col">
-      <div class="claim-head say">✓ We claim (far above noise)</div>
+      <div class="claim-head say">✓ 敢说（远超噪声量级）</div>
       <ul>
-        <li><span class="ic-say">✓</span><span><b>33 log entries ≠ 11 API calls</b> — duplicate bookkeeping inflates call count 3×</span></li>
-        <li><span class="ic-say">✓</span><span><b>89.3% of input traffic was cache hits</b> — 866,560 tokens rode the ~1/10-price invisible lane</span></li>
-        <li><span class="ic-say">✓</span><span><b>Cold start ≈ 30% of the bill</b> — the first call paid full price for 66,609 tokens</span></li>
-        <li><span class="ic-say">✓</span><span><b>One Bash result ≈ 16%</b> — a single 27,189-token output is the classic hidden fat order</span></li>
+        <li><span class="ic-say">✓</span><span><b>33 条记录 ≠ 11 次调用</b>——重复记账让调用数虚高 3 倍</span></li>
+        <li><span class="ic-say">✓</span><span><b>输入流量的 89.3% 是缓存命中</b>——866,560 tokens 走的是约 1/10 价的隐形通道</span></li>
+        <li><span class="ic-say">✓</span><span><b>冷启动 ≈ 全账单 30%</b>——第一次调用为 66,609 tokens 付了全价</span></li>
+        <li><span class="ic-say">✓</span><span><b>单条 Bash 结果 ≈ 16%</b>——一次 27,189 token 的大输出，就是隐形大单</span></li>
       </ul>
     </div>
     <div class="claim-col">
-      <div class="claim-head mute">✕ We don't claim (inside the boundary)</div>
+      <div class="claim-head mute">✕ 不说（边界之内）</div>
       <ul>
-        <li><span class="ic-mute">✕</span><span><b>Exact per-call attribution</b> — cache breakpoints are system-controlled, ±a few hundred tokens of fuzz</span></li>
-        <li><span class="ic-mute">✕</span><span><b>Industry-wide distribution</b> — n=1; we claim this session's structure only</span></li>
-        <li><span class="ic-mute">✕</span><span><b>Dollar amounts</b> — logs contain tokens, not money; pricing is per-model</span></li>
-        <li><span class="ic-mute">✕</span><span><b>Numbers for uncalibrated runtimes</b> — methodology verified on Claude Code v2.1.153 only</span></li>
+        <li><span class="ic-mute">✕</span><span><b>单次调用的精确归因</b>——缓存断点由系统决定，每处 ±几百 token 模糊</span></li>
+        <li><span class="ic-mute">✕</span><span><b>行业分布</b>——n=1，只声称这个 session 的结构</span></li>
+        <li><span class="ic-mute">✕</span><span><b>美元金额</b>——日志里没有钱；比价是假设，定价表按模型走</span></li>
+        <li><span class="ic-mute">✕</span><span><b>未校准 runtime 的数字</b>——口径只在 Claude Code v2.1.153 上验证</span></li>
       </ul>
     </div>
   </section>
 
   <section class="value-band">
-    <div class="section-label"><h2>Why this forensic is trustworthy</h2><span>not to be depended on — to be checked</span></div>
-    <p class="v-line">Credibility isn't a posture. It's <em>the reviewable path itself.</em></p>
+    <div class="section-label"><h2>为什么这份透视可信</h2><span>不是被依赖，而是可核查</span></div>
+    <p class="v-line">可信不是姿态，是<em>可复核的检验路径</em>。</p>
     <div class="v-grid">
-      <div class="v-card"><div class="who">For readers</div><h3>The right to verify</h3><p>The 30-second script below runs on your own logs. <b>Don't trust us — compute it yourself, then go question your current cost tool.</b></p></div>
-      <div class="v-card"><div class="who">For tool authors</div><h3>An executable checklist</h3><p>Dedup by id, split cache, pin versions — <b>all three are testable.</b> Do them and your tool survives a comment-section audit.</p></div>
-      <div class="v-card"><div class="who">For the numbers</div><h3>Honesty as a method</h3><p>Every claim ships with its noise bound; <b>what we can't say, we mark unsayable.</b> In a genre full of "trust me", that's scarce.</p></div>
+      <div class="v-card"><div class="who">给读者</div><h3>核查权在你手里</h3><p>下面 30 秒脚本跑在你自己的日志上。<b>不用信我们——自己算，然后去质问你现有的成本工具。</b></p></div>
+      <div class="v-card"><div class="who">给工具作者</div><h3>一份可执行的清单</h3><p>id 去重、缓存拆分、版本锚定——三条全部可测试。<b>照着做，你的工具就经得起评论区较真。</b></p></div>
+      <div class="v-card"><div class="who">给数字本身</div><h3>诚实作为方法</h3><p>每个结论都标注噪声边界；<b>说不出的结论就明说不出。</b>在满是"trust me"的赛道里，这本身是稀缺品。</p></div>
     </div>
     <div class="script-box">
-      <div class="script-head"><span>30-second self-test · on your own ~/.claude/projects</span><button class="copy-btn" id="copyBtn">Copy</button></div>
-      <pre id="scriptBody"><span class="cm"># Is your bill being miscounted? Run this.</span>
+      <div class="script-head"><span>30 秒自测 · 跑在你自己的 ~/.claude/projects 上</span><button class="copy-btn" id="copyBtn">复制</button></div>
+      <pre id="scriptBody"><span class="cm"># 你的账单被算错了吗？跑一下就知道</span>
 <span class="kw">import</span> json, glob
 calls = {}
 <span class="kw">for</span> fp <span class="kw">in</span> glob.glob(<span class="st">'~/.claude/projects/*/*.jsonl'</span>):
     <span class="kw">for</span> line <span class="kw">in</span> open(fp):
         r = json.loads(line)
         <span class="kw">if</span> r.get(<span class="st">'type'</span>) != <span class="st">'assistant'</span>: <span class="kw">continue</span>
-        calls[r[<span class="st">'message'</span>][<span class="st">'id'</span>]] = r[<span class="st">'message'</span>][<span class="st">'usage'</span>]  <span class="cm"># dedup by message.id</span>
+        calls[r[<span class="st">'message'</span>][<span class="st">'id'</span>]] = r[<span class="st">'message'</span>][<span class="st">'usage'</span>]  <span class="cm"># message.id 去重</span>
 fresh = sum(u[<span class="st">'input_tokens'</span>] <span class="kw">for</span> u <span class="kw">in</span> calls.values())
 cache = sum(u[<span class="st">'cache_read_input_tokens'</span>] <span class="kw">for</span> u <span class="kw">in</span> calls.values())
 out   = sum(u[<span class="st">'output_tokens'</span>] <span class="kw">for</span> u <span class="kw">in</span> calls.values())
-<span class="kw">print</span>(<span class="st">f"API calls: </span>{len(calls)}<span class="st"> | fresh: </span>{fresh:,}<span class="st"> | cache: </span>{cache:,}<span class="st"> (</span>{cache/(fresh+cache):.0%}<span class="st">) | out: </span>{out:,}<span class="st">"</span>)</pre>
+<span class="kw">print</span>(<span class="st">f"API 调用: </span>{len(calls)}<span class="st"> | fresh: </span>{fresh:,}<span class="st"> | cache: </span>{cache:,}<span class="st"> (</span>{cache/(fresh+cache):.0%}<span class="st">) | out: </span>{out:,}<span class="st">"</span>)</pre>
     </div>
   </section>
 
   <div class="section-label">
-    <h2>Multi-tool applicability</h2>
-    <span>local logs = detectable; pure cloud = hard boundary</span>
+    <h2>多工具适用性</h2>
+    <span>本地有日志就能检，纯云工具是物理边界</span>
   </div>
   <section class="tiers">
-    <div class="tier-row"><div class="tier-name">Claude Code<small>~/.claude/projects/</small></div><div class="tier-desc">Usage four-piece + message.id — this post's methodology was verified here.</div><div class="tier-badge b-ok">✓ verified</div></div>
-    <div class="tier-row"><div class="tier-name">ZCode<small>~/.zcode/cli/rollout/</small></div><div class="tier-desc">Full request bodies + exact usage per call; CJK estimate error 0.97–1.02.</div><div class="tier-badge b-ok">✓ verified</div></div>
-    <div class="tier-row"><div class="tier-name">Codex CLI<small>~/.codex/sessions/</small></div><div class="tier-desc">Verified: fresh / cache-read / cache-write split, reasoning tokens listed, plus 5h & weekly quota percent — richer than Claude Code.</div><div class="tier-badge b-ok">✓ verified</div></div>
-    <div class="tier-row"><div class="tier-name">OpenCode / pi agent / Hermes</div><div class="tier-desc">Verified gaps: OpenCode needs export; Hermes sessions are plain conversation without usage fields (volume estimation only); pi untested.</div><div class="tier-badge b-warn">⚠ degraded</div></div>
-    <div class="tier-row"><div class="tier-name">Pure-cloud tools (e.g. DeepSeek web)</div><div class="tier-desc">No local logs — the hard boundary of the zero-integration method. Waits for vendor export.</div><div class="tier-badge b-no">✕ out of scope</div></div>
+    <div class="tier-row"><div class="tier-name">Claude Code<small>~/.claude/projects/</small></div><div class="tier-desc">usage 四件套 + message.id，本文口径已在此验证。</div><div class="tier-badge b-ok">✓ 已验证</div></div>
+    <div class="tier-row"><div class="tier-name">ZCode<small>~/.zcode/cli/rollout/</small></div><div class="tier-desc">每次调用完整请求体 + 精确 usage，CJK 估算误差 0.97–1.02。</div><div class="tier-badge b-ok">✓ 已验证</div></div>
+    <div class="tier-row"><div class="tier-name">Codex CLI<small>~/.codex/sessions/</small></div><div class="tier-desc">已验证：fresh / cache-read / cache-write 三桶分列，reasoning 输出单列，还附 5 小时/每周配额百分比——字段比 Claude Code 更全。</div><div class="tier-badge b-ok">✓ 已验证</div></div>
+    <div class="tier-row"><div class="tier-name">OpenCode / pi agent / Hermes</div><div class="tier-desc">已核实：OpenCode 本地存储不暴露 usage（需 export）；Hermes 会话为纯对话、无 usage 字段（只能体积估算）；pi 未测。</div><div class="tier-badge b-warn">⚠ 降级支持</div></div>
+    <div class="tier-row"><div class="tier-name">DeepSeek 网页版等纯云工具</div><div class="tier-desc">没有本地日志——零接入方法的物理边界，只能等服务方导出。</div><div class="tier-badge b-no">✕ 边界外</div></div>
   </section>
 
   <section class="final">
-    <h2>Agents re-read their entire history <em>before every reply.</em></h2>
-    <p>Run the script on your own logs and look at your memory-to-thinking ratio. If your report never told you the cache share, the cold-start share, or the single fat command — now you know the gap, and what to demand from your tools.</p>
+    <h2>Agent 每回答一句，<em>都先把历史重读一遍。</em></h2>
+    <p>把脚本跑在你自己的日志上，看看你的账单里记忆和思考的比例。如果你的报表从没告诉过你缓存占比、冷启动和大单——现在你知道差距在哪了，也知道该向工具要求什么。</p>
     <div class="meta">
       <span>session <b>d823d9e5</b></span><span>·</span>
-      <span><b>257</b> log lines</span><span>·</span>
+      <span><b>257</b> 行日志</span><span>·</span>
       <span>Claude Code <b>v2.1.153</b></span><span>·</span>
-      <span>reconciled: <b>ccusage, token-exact</b></span><span>·</span>
-      <span><b>single-file HTML</b> · no external deps</span>
+      <span>对账：<b>ccusage 逐 token 一致</b></span><span>·</span>
+      <span><b>单文件 HTML</b> · 无外部依赖</span>
     </div>
   </section>
 
   <div class="foot">
-    Data: real session d823d9e5 (glm-5-3-flash via proxy; cache_creation always 0 — proxy likely dropped the field) · ratios are typical assumptions · n=1<br>
-    <b>Bill Forensics</b> — interactive companion to "We Counted Our Own Agent Bill Wrong by 3×" · <a href="zh.html" style="color:var(--cyan)">中文版</a>
+    数据：真实 session d823d9e5（glm-5-3-flash 经代理，cache_creation 恒 0 疑似代理丢失字段）· 比价为典型假设 · n=1<br>
+    <b>账单透视</b> — interactive companion to《我们把自己的 Agent 账单算错了 3 倍》
   </div>
 </div>
 
-<div class="toast" id="toast">Script copied — go run it on your own logs</div>
+<div class="toast" id="toast">脚本已复制 — 去跑你自己的日志</div>
 
 <script>
-// naive ⇄ honest ledger toggle
+// naive ⇄ honest 切换
 const STATES = {
   naive: {
     calls: "33", input: "339,088", out: "16,245",
-    notes: ["Counting every log record as one call — streaming responses are logged 2–4 times each, all counted.",
-            "Duplicate records summed directly — the same usage snapshot counted 3.3 times.",
-            "Also double-counted — inflated 2.4×."],
-    verdict: "⚠️ This ledger treats 3× noise as fact", cls: "warn"
+    notes: ["把每条日志记录当成一次调用——流式响应被记 2–4 条，全算了一遍。",
+            "重复记录直接加总——同一份 usage 被数了 3.3 次。",
+            "同样被重复计数，虚高 2.4 倍。"],
+    verdict: "⚠️ 这个口径把 3 倍的噪声当成了事实", cls: "warn"
   },
   honest: {
     calls: "11", input: "103,616", out: "6,734",
-    notes: ["Real billed calls after message.id dedup.",
-            "The full-price part; another 866,560 cache_read tokens rode at ~1/10 price.",
-            "True output after dedup — the final long reply alone was 31%."],
-    verdict: "✓ message.id dedup + three-bucket cache split · reconciled with ccusage token-for-token", cls: "good"
+    notes: ["按 message.id 去重后的真实计费次数。",
+            "fresh input 全价部分；另有 866,560 cache_read 走约 1/10 价。",
+            "去重后的真实输出——最后一次长回复占 31%。"],
+    verdict: "✓ 口径：message.id 去重 + 缓存三桶拆分 · 已与 ccusage 逐 token 对账一致", cls: "good"
   }
 };
 function setMode(mode) {
@@ -369,8 +375,8 @@ document.getElementById("tgHonest").addEventListener("click", () => setMode("hon
 document.getElementById("copyBtn").addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(document.getElementById("scriptBody").innerText);
-    showToast("Script copied — go run it on your own logs");
-  } catch (_) { showToast("Copy failed — select manually"); }
+    showToast("脚本已复制 — 去跑你自己的日志");
+  } catch (_) { showToast("复制失败 — 请手动选择"); }
 });
 function showToast(msg) {
   const t = document.getElementById("toast");
@@ -378,9 +384,12 @@ function showToast(msg) {
   setTimeout(() => { t.style.opacity = "0"; t.style.transform = "translate(-50%,14px)"; }, 2200);
 }
 
-// deep link: ?mode=honest opens straight into the honest ledger
+// 深链支持：?mode=honest 直接以诚实口径+Step 4 打开（供截图与分享）
 if (new URLSearchParams(location.search).get("mode") === "honest") {
   setMode("honest");
+  document.querySelectorAll("#steps .step").forEach((s, i) => { s.classList.toggle("active", i === 3); s.classList.toggle("done", i <= 3); });
+  const cap = document.getElementById("stepCaption");
+  if (cap) cap.textContent = "Step 4 of 4 · single-file card, ready to share";
 }
 </script>
 </body>
