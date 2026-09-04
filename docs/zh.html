@@ -287,7 +287,8 @@
     </div>
     <div class="script-box">
       <div class="script-head"><span>30 秒自测 · 跑在你自己的 ~/.claude/projects 上</span><button class="copy-btn" id="copyBtn">复制</button></div>
-      <pre id="scriptBody">import json, glob, os
+      <pre id="scriptBody">python3 - &lt;&lt;'EOF'
+import json, glob, os
 calls = {}
 for fp in glob.glob(os.path.expanduser('~/.claude/projects/*/*.jsonl')):
     for line in open(fp, encoding='utf-8'):
