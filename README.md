@@ -36,16 +36,24 @@ One sentence: **85% of the bill is memory operations** — loading context and r
 Run it on your own `~/.claude/projects`, then go ask your current cost tool why its numbers differ:
 
 ```python
-import json, glob
+import json, glob, os
 calls = {}
-for fp in glob.glob('~/.claude/projects/*/*.jsonl'):
-    for line in open(fp):
-        r = json.loads(line)
-        if r.get('type') != 'assistant': continue
-        calls[r['message']['id']] = r['message']['usage']  # dedup by message.id
-fresh = sum(u['input_tokens'] for u in calls.values())
-cache = sum(u['cache_read_input_tokens'] for u in calls.values())
-out   = sum(u['output_tokens'] for u in calls.values())
+for fp in glob.glob(os.path.expanduser('~/.claude/projects/*/*.jsonl')):
+    for line in open(fp, encoding='utf-8'):
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if r.get('type') != 'assistant':
+            continue
+        m = r.get('message') or {}
+        u = m.get('usage')
+        if not (m.get('id') and u):
+            continue
+        calls[m['id']] = u  # dedup by message.id
+fresh = sum(u.get('input_tokens', 0) for u in calls.values())
+cache = sum(u.get('cache_read_input_tokens', 0) for u in calls.values())
+out   = sum(u.get('output_tokens', 0) for u in calls.values())
 print(f"API calls: {len(calls)} | fresh: {fresh:,} | cache: {cache:,} ({cache/(fresh+cache):.0%}) | out: {out:,}")
 ```
 

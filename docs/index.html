@@ -281,18 +281,26 @@
     </div>
     <div class="script-box">
       <div class="script-head"><span>30-second self-test · on your own ~/.claude/projects</span><button class="copy-btn" id="copyBtn">Copy</button></div>
-      <pre id="scriptBody"><span class="cm"># Is your bill being miscounted? Run this.</span>
-<span class="kw">import</span> json, glob
+      <pre id="scriptBody">import json, glob, os
 calls = {}
-<span class="kw">for</span> fp <span class="kw">in</span> glob.glob(<span class="st">'~/.claude/projects/*/*.jsonl'</span>):
-    <span class="kw">for</span> line <span class="kw">in</span> open(fp):
-        r = json.loads(line)
-        <span class="kw">if</span> r.get(<span class="st">'type'</span>) != <span class="st">'assistant'</span>: <span class="kw">continue</span>
-        calls[r[<span class="st">'message'</span>][<span class="st">'id'</span>]] = r[<span class="st">'message'</span>][<span class="st">'usage'</span>]  <span class="cm"># dedup by message.id</span>
-fresh = sum(u[<span class="st">'input_tokens'</span>] <span class="kw">for</span> u <span class="kw">in</span> calls.values())
-cache = sum(u[<span class="st">'cache_read_input_tokens'</span>] <span class="kw">for</span> u <span class="kw">in</span> calls.values())
-out   = sum(u[<span class="st">'output_tokens'</span>] <span class="kw">for</span> u <span class="kw">in</span> calls.values())
-<span class="kw">print</span>(<span class="st">f"API calls: </span>{len(calls)}<span class="st"> | fresh: </span>{fresh:,}<span class="st"> | cache: </span>{cache:,}<span class="st"> (</span>{cache/(fresh+cache):.0%}<span class="st">) | out: </span>{out:,}<span class="st">"</span>)</pre>
+for fp in glob.glob(os.path.expanduser('~/.claude/projects/*/*.jsonl')):
+    for line in open(fp, encoding='utf-8'):
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if r.get('type') != 'assistant':
+            continue
+        m = r.get('message') or {}
+        u = m.get('usage')
+        if not (m.get('id') and u):
+            continue
+        calls[m['id']] = u  # dedup by message.id
+fresh = sum(u.get('input_tokens', 0) for u in calls.values())
+cache = sum(u.get('cache_read_input_tokens', 0) for u in calls.values())
+out   = sum(u.get('output_tokens', 0) for u in calls.values())
+print(f"API calls: {len(calls)} | fresh: {fresh:,} | cache: {cache:,} ({cache/(fresh+cache):.0%}) | out: {out:,}")
+EOF</pre>
     </div>
   </section>
 
