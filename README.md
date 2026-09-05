@@ -19,7 +19,7 @@ Forensics on one real Claude Code session — 7 minutes, one code-review task, 2
 
 First, the elephant in the room: **the provider's bill is correct.** We reconciled against [ccusage](https://github.com/ryoppippi/ccusage) and it matches our deduplicated numbers to the token. What was wrong is hand-counting from logs. And that exposes the actual question:
 
-> **Metering is solved. Diagnosis is not.** 89.3% of input traffic was cache re-reads. 30% of the bill was cold start. One command ate 16%. No tool surfaces any of this.
+> **Metering is solved. Diagnosis is not.** 89.3% of input traffic was cache re-reads. 30% of the bill was cold start. One command ate 16%. No mainstream tool surfaces any of this as a first-class output — [retok](https://github.com/d-date/retok) built rule-based diagnosis and stalled at 33 stars; ccusage, the metering standard, doesn't compute them at all.
 
 ## Same log, two ledgers
 
@@ -44,7 +44,7 @@ One sentence: **85% of the bill is memory operations** — loading context and r
 
 ## The 30-second self-test
 
-Run it on your own `~/.claude/projects`, then go ask your current cost tool why its numbers differ:
+Run it on your own `~/.claude/projects`, then go ask your current cost tool why its numbers differ (paste-safe heredoc below, or grab [count.py](count.py)):
 
 ```python
 import json, glob, os
@@ -78,7 +78,7 @@ print(f"API calls: {len(calls)} | fresh: {fresh:,} | cache: {cache:,} ({cache/(f
 
 ## Full write-up
 
-[article.zh.md](article.zh.md) (Chinese) — methodology and error bounds, the reconciliation experiment, and the multi-tool support matrix:
+Full methodology and error bounds: [article.en.md](article.en.md) (English) · [article.zh.md](article.zh.md) (Chinese) — including the reconciliation experiment:
 
 <details>
 <summary><b>Multi-tool support matrix (verified first-hand on this machine)</b></summary>
